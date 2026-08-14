@@ -36,10 +36,10 @@ echo "If none detected above: no memory system found"
 
 | Detection | DREAM_MEMORY_TYPE | Memory location | Session transcripts |
 |-----------|-------------------|-----------------|-------------------|
-| `~/.claude/projects/*/memory/MEMORY.md` exists | `native` | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| `./memory/20*.md` daily log files exist | `openclaw` | `./memory/` (project root) | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| `./MEMORY.md` exists in project root | `project-root` | `./` (project root, MEMORY.md + topic files) | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| Nothing found | `native` (default) | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/sessions/*.jsonl` |
+| `~/.claude/projects/*/memory/MEMORY.md` exists | `native` | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/*.jsonl` |
+| `./memory/20*.md` daily log files exist | `openclaw` | `./memory/` (project root) | `~/.claude/projects/<project>/*.jsonl` |
+| `./MEMORY.md` exists in project root | `project-root` | `./` (project root, MEMORY.md + topic files) | `~/.claude/projects/<project>/*.jsonl` |
+| Nothing found | `native` (default) | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/*.jsonl` |
 
 **If no memory system is found, default to native Claude Code memory.** This is the standard and requires no extra setup - Claude Code creates the directory automatically when auto-memory is enabled.
 
@@ -214,11 +214,13 @@ You should now have a mental map of:
 **Goal:** Extract important information from recent sessions without reading everything.
 
 ### Where to find transcripts
+
+Session JSONL files live directly under each project's directory — there is no `sessions/` subfolder:
 ```bash
-find ~/.claude/projects/*/sessions/ -name "*.jsonl" -mtime -7 2>/dev/null | sort -t/ -k6 -r
+find ~/.claude/projects/*/ -maxdepth 1 -name "*.jsonl" -mtime -7 -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-
 ```
 
-This finds JSONL session files modified in the last 7 days, sorted newest first. Adjust `-mtime -7` for different windows.
+This finds JSONL session files modified in the last 7 days, sorted newest first by actual modification time. Adjust `-mtime -7` for different windows.
 
 ### What to scan for
 
@@ -226,22 +228,22 @@ Use targeted grep, not full reads. Each pattern targets a specific signal type:
 
 **User corrections** (highest priority):
 ```bash
-grep -il "actually\|no,\|wrong\|incorrect\|not right\|stop doing\|don't do\|I said\|I meant\|that's not\|correction" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "actually\|no,\|wrong\|incorrect\|not right\|stop doing\|don't do\|I said\|I meant\|that's not\|correction" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Preferences and configuration:**
 ```bash
-grep -il "I prefer\|always use\|never use\|I like\|I don't like\|I want\|from now on\|going forward\|remember that\|keep in mind\|make sure to\|default to" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "I prefer\|always use\|never use\|I like\|I don't like\|I want\|from now on\|going forward\|remember that\|keep in mind\|make sure to\|default to" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Important decisions:**
 ```bash
-grep -il "let's go with\|I decided\|we're using\|the plan is\|switch to\|move to\|chosen\|picked\|decision\|we agreed" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "let's go with\|I decided\|we're using\|the plan is\|switch to\|move to\|chosen\|picked\|decision\|we agreed" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Recurring patterns:**
 ```bash
-grep -il "again\|every time\|keep forgetting\|as usual\|same as before\|like last time\|we always\|the usual" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "again\|every time\|keep forgetting\|as usual\|same as before\|like last time\|we always\|the usual" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 ### How to read matches
