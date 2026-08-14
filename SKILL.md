@@ -36,10 +36,10 @@ echo "If none detected above: no memory system found"
 
 | Detection | DREAM_MEMORY_TYPE | Memory location | Session transcripts |
 |-----------|-------------------|-----------------|-------------------|
-| `~/.claude/projects/*/memory/MEMORY.md` exists | `native` | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| `./memory/20*.md` daily log files exist | `openclaw` | `./memory/` (project root) | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| `./MEMORY.md` exists in project root | `project-root` | `./` (project root, MEMORY.md + topic files) | `~/.claude/projects/<project>/sessions/*.jsonl` |
-| Nothing found | `native` (default) | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/sessions/*.jsonl` |
+| `~/.claude/projects/*/memory/MEMORY.md` exists | `native` | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/*.jsonl` |
+| `./memory/20*.md` daily log files exist | `openclaw` | `./memory/` (project root) | `~/.claude/projects/<project>/*.jsonl` |
+| `./MEMORY.md` exists in project root | `project-root` | `./` (project root, MEMORY.md + topic files) | `~/.claude/projects/<project>/*.jsonl` |
+| Nothing found | `native` (default) | `~/.claude/projects/<project>/memory/` | `~/.claude/projects/<project>/*.jsonl` |
 
 **If no memory system is found, default to native Claude Code memory.** This is the standard and requires no extra setup - Claude Code creates the directory automatically when auto-memory is enabled.
 
@@ -214,11 +214,13 @@ You should now have a mental map of:
 **Goal:** Extract important information from recent sessions without reading everything.
 
 ### Where to find transcripts
+
+Session JSONL files live directly under each project's directory — there is no `sessions/` subfolder:
 ```bash
-find ~/.claude/projects/*/sessions/ -name "*.jsonl" -mtime -7 2>/dev/null | sort -t/ -k6 -r
+find ~/.claude/projects/*/ -maxdepth 1 -name "*.jsonl" -mtime -7 -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2-
 ```
 
-This finds JSONL session files modified in the last 7 days, sorted newest first. Adjust `-mtime -7` for different windows.
+This finds JSONL session files modified in the last 7 days, sorted newest first by actual modification time. Adjust `-mtime -7` for different windows.
 
 ### What to scan for
 
@@ -226,22 +228,22 @@ Use targeted grep, not full reads. Each pattern targets a specific signal type:
 
 **User corrections** (highest priority):
 ```bash
-grep -il "actually\|no,\|wrong\|incorrect\|not right\|stop doing\|don't do\|I said\|I meant\|that's not\|correction" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "actually\|no,\|wrong\|incorrect\|not right\|stop doing\|don't do\|I said\|I meant\|that's not\|correction" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Preferences and configuration:**
 ```bash
-grep -il "I prefer\|always use\|never use\|I like\|I don't like\|I want\|from now on\|going forward\|remember that\|keep in mind\|make sure to\|default to" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "I prefer\|always use\|never use\|I like\|I don't like\|I want\|from now on\|going forward\|remember that\|keep in mind\|make sure to\|default to" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Important decisions:**
 ```bash
-grep -il "let's go with\|I decided\|we're using\|the plan is\|switch to\|move to\|chosen\|picked\|decision\|we agreed" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "let's go with\|I decided\|we're using\|the plan is\|switch to\|move to\|chosen\|picked\|decision\|we agreed" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 **Recurring patterns:**
 ```bash
-grep -il "again\|every time\|keep forgetting\|as usual\|same as before\|like last time\|we always\|the usual" ~/.claude/projects/*/sessions/*.jsonl 2>/dev/null
+grep -il "again\|every time\|keep forgetting\|as usual\|same as before\|like last time\|we always\|the usual" ~/.claude/projects/*/*.jsonl 2>/dev/null
 ```
 
 ### How to read matches
@@ -292,6 +294,29 @@ For each finding, note:
 ### How to write
 
 Use the Edit tool to modify existing memory files, or Write to create new topic files. Always read a file before editing it.
+
+### Marrow interface (if configured)
+
+Read `~/.claude/CLAUDE.md` and check for a `## Marrow Configuration` section defining `GLOBAL_VAULT_PATH`. If that section is absent, skip this subsection entirely — everything goes to native memory topic files as described above, exactly as before.
+
+If Marrow **is** configured, split findings by scope before writing:
+
+- **Project-specific facts** (tied to one project/repo, or personal/user context that doesn't generalize) — write to native memory topic files as normal, unchanged. Additionally, if the current project is Marrow-enrolled (a `./04_Knowledge/field_notes.md` exists at the project root) and `./01_Inbox/auto_capture.md` exists, append the finding there too, under `## Unreviewed`, in this format:
+  ```markdown
+  [UNREVIEWED] [YYYY-MM-DD] {Type: Decision|Local Pattern|Roadmap} -- [finding] -- Context: [session/source]
+  ```
+  This is a safety net for sessions where `/close` never ran, not a promotion path: `/close` reads this file on its next run, folds relevant entries into its human-gated staging area, and archives/clears what it processes. `01_Inbox/auto_capture.md` is the only local-vault file Dream may write to directly — never `decision_log.md`, `active_roadmap.md`, or any Tier 1/Tier 2 section of the local `field_notes.md`. Never write an inbox entry for anything the user already saw and declined during `/close`'s staging step earlier in the same session.
+- **Cross-project patterns** (a preference, correction, or recurring pattern general enough to hold regardless of project) — do not write these to native memory. Instead, stage them as Marrow Tier 0 Promotion Candidates:
+  1. Read `{GLOBAL_VAULT_PATH}/04_Knowledge/field_notes.md`.
+  2. If a `## Tier 0: Promotion Candidates` section doesn't exist yet, create it (insert it before `## Tier 2: Active Principles`, after the title/intro lines).
+  3. Append the entry under that section in this format:
+     ```markdown
+     <!-- staged by Dream YYYY-MM-DD -->
+     - [Imperative-phrased rule]. Context: [where it surfaced].
+     ```
+     Phrase the rule imperatively ("When X, do Y", "Never Z", "Before W, check V") — `/weekly-review` expects this form when it later promotes the entry to Tier 2.
+- **Never** write directly to `## Tier 2: Active Principles` yourself. That promotion only happens through `/weekly-review`'s human-confirmed pipeline (see its "Dream-Marrow Interface" section).
+- **Never** stage a Tier 0 candidate for anything the user already saw and explicitly declined to commit via `/close`'s staging step earlier in the same session — that was a considered "no," not something to re-surface through a side channel.
 
 ---
 

@@ -12,7 +12,7 @@ When you use Claude Code across many sessions, auto-memory accumulates noise: st
 
 **Phase 2 - Gather Signal:** Scans recent session transcripts (JSONL files) for user corrections, preference changes, important decisions, and recurring patterns. Uses targeted grep, not full reads.
 
-**Phase 3 - Consolidate:** Merges new findings into existing memory. Converts relative dates to absolute. Resolves contradictions. Removes references to nonexistent files. No duplicates.
+**Phase 3 - Consolidate:** Merges new findings into existing memory. Converts relative dates to absolute. Resolves contradictions. Removes references to nonexistent files. No duplicates. If a Marrow vault is configured (`GLOBAL_VAULT_PATH` in `~/.claude/CLAUDE.md`), cross-project patterns are staged as Tier 0 Promotion Candidates in the global vault for `/weekly-review` to later promote. Project-specific facts still go to native memory as usual, and additionally -- if the current repo is Marrow-enrolled -- to `01_Inbox/auto_capture.md` as unreviewed entries, a safety net `/close` sweeps on its next run.
 
 **Phase 4 - Prune & Index:** Rebuilds MEMORY.md as a lean index under 200 lines. Removes stale pointers. Demotes verbose entries to topic files.
 
