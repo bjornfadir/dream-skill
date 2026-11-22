@@ -274,7 +274,7 @@ For each finding, note:
 
 2. **Convert relative dates to absolute.** If a session from March 15 says "yesterday I changed the API key", write "2026-03-14: Changed API key" in memory. Never store "yesterday" or "last week".
 
-3. **Delete contradicted facts.** If memory says "Prefers tabs" but a recent session has the user saying "Use spaces", remove the old entry and write the new one. Add a note: `(Updated YYYY-MM-DD, previously: tabs)`.
+3. **Delete contradicted facts.** If memory says "Prefers tabs" but a recent session has the user saying "Use spaces", remove the old entry and write the new one. Add a note: `(Updated YYYY-MM-DD, previously: tabs)`. When Marrow is configured, skip this note and write only the current rule (see "MEMORY.md rules when Marrow is configured" in Phase 4).
 
 4. **Preserve source attribution.** When adding a new memory entry, note where it came from: `(from session YYYY-MM-DD)`.
 
@@ -299,13 +299,23 @@ Use the Edit tool to modify existing memory files, or Write to create new topic 
 
 Read `~/.claude/CLAUDE.md` and check for a `## Marrow Configuration` section defining `GLOBAL_VAULT_PATH`. If that section is absent, skip this subsection entirely — everything goes to native memory topic files as described above, exactly as before.
 
-If Marrow **is** configured, split findings by scope before writing:
+If Marrow **is** configured, split findings by scope before writing. Native memory then holds only two kinds of content: (a) user preferences, feedback and corrections, and cross-project references (tool locations, API gotchas); (b) one-line pointers to vaults. Project facts never go to native memory.
 
-- **Project-specific facts** (tied to one project/repo, or personal/user context that doesn't generalize) — write to native memory topic files as normal, unchanged. Additionally, if the current project is Marrow-enrolled (a `./04_Knowledge/field_notes.md` exists at the project root) and `./01_Inbox/auto_capture.md` exists, append the finding there too, under `## Unreviewed`, in this format:
-  ```markdown
-  [UNREVIEWED] [YYYY-MM-DD] {Type: Decision|Local Pattern|Roadmap} -- [finding] -- Context: [session/source]
-  ```
-  This is a safety net for sessions where `/close` never ran, not a promotion path: `/close` reads this file on its next run, folds relevant entries into its human-gated staging area, and archives/clears what it processes. `01_Inbox/auto_capture.md` is the only local-vault file Dream may write to directly — never `decision_log.md`, `active_roadmap.md`, or any Tier 1/Tier 2 section of the local `field_notes.md`. Never write an inbox entry for anything the user already saw and declined during `/close`'s staging step earlier in the same session.
+- **Project facts** (status, decisions, what was built, open items, dates, numbers tied to one project, household or life-admin topic) go to the **owning vault's** `01_Inbox/auto_capture.md`, not to native memory:
+  1. Find the owner. Read the vault registry at `{GLOBAL_VAULT_PATH}/00_System/vault_registry.md`. Pick the vault whose `Path` holds the files the session touched, or whose `Purpose` covers the topic. If no vault fits, use the root vault (`PROJECT_ROOT` from the Marrow Configuration section).
+  2. Obey that vault's `Guardrails` line, and the guardrails of the vault the fact came from. Examples: a health vault's content (medical, journal, mood, family) is written only to that vault and never copied elsewhere; a finance vault's PII (account, ID or card numbers) is never copied into any file. If a guardrail forbids the write, write nothing for that fact.
+  3. Append one line to `<vault path>/01_Inbox/auto_capture.md`, at the end of the file (the end is under `## Unreviewed`):
+     ```markdown
+     [UNREVIEWED] [YYYY-MM-DD] {Type: Decision|Knowledge|Roadmap} -- [finding] -- Context: [session/source] <!-- tags: a,b -->
+     ```
+     Use `Knowledge` for a reusable fact or pattern. The tags comment follows the Tags rule below; leave it out when no tag fits.
+  4. Append only. Do one append (`>>`) per entry and never rewrite or reorder the file: other sessions and agents append to it too. If the file does not exist, create it with the same append, starting with a `# Auto-Captured Session Notes (Unreviewed)` title and a `## Unreviewed` heading.
+  5. Before you append, grep the file for the session ID or the key phrase. Do not add a duplicate.
+  6. Optionally keep or add one pointer line in `MEMORY.md` (see Phase 4). Do not create or grow a native topic file for the fact.
+
+  This is a safety net for sessions where `/close` never ran, not a promotion path: `/close` reads this file on its next run, folds relevant entries into its human-gated staging area, and archives/clears what it processes. `01_Inbox/auto_capture.md` is the only vault file Dream may write to directly — never `decision_log.md`, `active_roadmap.md`, or any Tier 1/Tier 2 section of a local `field_notes.md`. Never write an inbox entry for anything the user already saw and declined during `/close`'s staging step earlier in the same session.
+- **Existing project topic files in native memory.** In Phase 1, if a native topic file holds project facts (dated status updates, "(source: session ...)" chains, open items), move its substance to the owning vault's inbox as above, then delete the file or cut it to a short pointer. Back up the memory directory first (see Safety).
+- **Tags.** Read every `00_System/tags.md` file under `PROJECT_ROOT` and the vault paths in the registry (for example `{PROJECT_ROOT}/00_System/tags.md`). Their `## Tags` lists, together, are the only allowed tags. Give each inbox entry 0 to 3 tags from those lists: lowercase, exact spelling, a subject the entry is about. Never invent a tag; new tags are added only through `/close` or `/weekly-review`. If no `tags.md` file exists, write no tags comment.
 - **Cross-project patterns** (a preference, correction, or recurring pattern general enough to hold regardless of project) — do not write these to native memory. Instead, stage them as Marrow Tier 0 Promotion Candidates:
   1. Read `{GLOBAL_VAULT_PATH}/04_Knowledge/field_notes.md`.
   2. If a `## Tier 0: Promotion Candidates` section doesn't exist yet, create it (insert it before `## Tier 2: Active Principles`, after the title/intro lines).
@@ -376,6 +386,16 @@ Last consolidated: YYYY-MM-DD
 ```
 
 The Quick Reference section is for facts so important they should be seen every time memory is loaded. Keep it to 10 items maximum.
+
+### MEMORY.md rules when Marrow is configured
+
+These rules replace the index format above. MEMORY.md loads into every session, so keep it small.
+
+- Write one line per memory: `- [Title](file.md): one short summary`. Keep each line under about 150 characters.
+- Never add a date, a status update or a "previously ..." note to an index line. Do not chain updates ("10/14 ...; 11/2 ...; 11/9 ..."). When a fact changes, rewrite the summary to the current truth, or move the change to the owning vault's inbox.
+- Group lines under `## Feedback`, `## User`, `## Reference` and `## Project pointers`. A project pointer names the vault that holds the facts, nothing more.
+- Keep MEMORY.md at 6KB or less. Check with `wc -c`. If it is larger, move project content to vault inboxes and shorten summaries until it fits.
+- Topic files follow the same rule: no dated status chains. A topic file holds a preference, a correction or a reference, written as the current rule.
 
 ### Record the dream timestamp
 
